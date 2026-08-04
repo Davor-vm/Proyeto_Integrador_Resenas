@@ -1,0 +1,8 @@
+{
+    "python.analysis.extraPaths": [
+        "./scripts/preprocessing",
+        "./scripts/scraping",
+        "./scripts/clustering",
+        "./scripts/etl"
+    ]
+}

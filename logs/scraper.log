@@ -10,3 +10,15 @@
 2026-08-04 01:52:35 | INFO | Guardados 4 productos en F:\Work\Proyeto_Integrador_Resenas\data\raw\productos_raw.csv
 2026-08-04 01:52:35 | INFO | Guardadas 860 reseñas REALES en F:\Work\Proyeto_Integrador_Resenas\data\raw\reviews_raw.csv
 2026-08-04 01:52:35 | INFO | === Scraping Finalizado Exitosamente ===
+2026-08-04 14:07:15 | INFO | === Inicio de Scraping Enfocado: Audífonos Sony & Apple (Over-Ear vs In-Ear) ===
+2026-08-04 14:07:15 | INFO | Procesando [1/4]: Apple AirPods Max 2 (Over-Ear) - ID: MLM1066705967
+2026-08-04 14:07:51 | INFO | Total de reseñas capturadas para 'Apple AirPods Max 2': 164
+2026-08-04 14:07:51 | INFO | Procesando [2/4]: Sony WH-1000XM5 Over-Ear (Over-Ear) - ID: MLM42305910
+2026-08-04 14:09:03 | INFO | Total de reseñas capturadas para 'Sony WH-1000XM5 Over-Ear': 300
+2026-08-04 14:09:03 | INFO | Procesando [3/4]: Sony WF-1000XM5 In-Ear (In-Ear) - ID: MLM26578383
+2026-08-04 14:09:24 | INFO | Total de reseñas capturadas para 'Sony WF-1000XM5 In-Ear': 97
+2026-08-04 14:09:24 | INFO | Procesando [4/4]: Apple AirPods Pro In-Ear (In-Ear) - ID: MLM1054106888
+2026-08-04 14:10:35 | INFO | Total de reseñas capturadas para 'Apple AirPods Pro In-Ear': 300
+2026-08-04 14:10:36 | INFO | Guardados 4 productos en F:\Work\Proyeto_Integrador_Resenas\data\raw\productos_raw.csv
+2026-08-04 14:10:36 | INFO | Guardadas 861 reseñas REALES en F:\Work\Proyeto_Integrador_Resenas\data\raw\reviews_raw.csv
+2026-08-04 14:10:36 | INFO | === Scraping Finalizado Exitosamente ===

@@ -1,22 +1,4 @@
 import duckdb
-
-conexion = duckdb.connect("data/warehouse/reviews.db")
-
-conexion.execute("""
-CREATE TABLE IF NOT EXISTS prueba(
-    id INTEGER,
-    nombre VARCHAR
-)
-""")
-
-conexion.execute("""
-INSERT INTO prueba VALUES
-(1,'Jonathan'),
-(2,'Proyecto')
-""")
-
-resultado = conexion.execute("SELECT * FROM prueba").fetchall()
-
-print(resultado)
-
-conexion.close()
+con = duckdb.connect("data/warehouse/reviews.db")
+print(con.execute("SELECT * FROM Fact_Reviews LIMIT 5").fetchall())
+con.close()
