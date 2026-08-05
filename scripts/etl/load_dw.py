@@ -1,6 +1,8 @@
 import os
+import re
 import duckdb
 import pandas as pd
+from datetime import datetime, timedelta
 from pathlib import Path
 
 # Configuración de rutas según la arquitectura del proyecto
@@ -14,6 +16,39 @@ WAREHOUSE_DIR.mkdir(parents=True, exist_ok=True)
 
 DB_PATH = WAREHOUSE_DIR / "reviews.db"
 SCHEMA_PATH = SQL_DIR / "schema.sql"
+
+def parse_relative_date(date_str) -> datetime:
+    """
+    Convierte cadenas de fecha en español (absolutas o relativas como 'Hace 2 meses')
+    a un objeto datetime.
+    """
+    if pd.isna(date_str) or not isinstance(date_str, str):
+        return datetime.now()
+    
+    date_str_clean = date_str.lower().strip()
+    now = datetime.now()
+    
+    match = re.search(r'hace\s+(\d+)\s+(día|dias|días|mes|meses|año|años|semana|semanas|hora|horas)', date_str_clean)
+    if match:
+        cantidad = int(match.group(1))
+        unidad = match.group(2)
+        
+        if 'hora' in unidad:
+            return now - timedelta(hours=cantidad)
+        elif 'día' in unidad or 'dia' in unidad:
+            return now - timedelta(days=cantidad)
+        elif 'semana' in unidad:
+            return now - timedelta(weeks=cantidad)
+        elif 'mes' in unidad:
+            return now - timedelta(days=cantidad * 30)
+        elif 'año' in unidad:
+            return now - timedelta(days=cantidad * 365)
+            
+    # Intentar parsear si la fecha ya viene en formato estándar (ej. 2024-05-10)
+    try:
+        return pd.to_datetime(date_str, dayfirst=True)
+    except Exception:
+        return now
 
 def clasificar_longitud_tipo(length: int) -> int:
     """Retorna el ID de Dim_ReviewType según la longitud en caracteres del comentario."""
@@ -72,8 +107,8 @@ def ejecutar_etl_dw():
     con.execute("INSERT INTO Dim_Product SELECT * FROM temp_product;")
     print(f"Dim_Product poblada ({len(df_product)} productos).")
 
-    # 4. Poblado de Dim_Date
-    df['fecha_dt'] = pd.to_datetime(df['fecha_review'], errors='coerce').fillna(pd.Timestamp.now())
+    # 4. Poblado de Dim_Date (Ajustado para parsear texto relativo)
+    df['fecha_dt'] = df['fecha_review'].apply(parse_relative_date)
     dates_unique = df['fecha_dt'].drop_duplicates().sort_values()
 
     df_date = pd.DataFrame({
@@ -86,7 +121,7 @@ def ejecutar_etl_dw():
     })
     con.register('temp_date', df_date)
     con.execute("INSERT INTO Dim_Date SELECT * FROM temp_date;")
-    print(f"Dim_Date poblada ({len(df_date)} fechas).")
+    print(f"Dim_Date poblada ({len(df_date)} fechas unicas generadas).")
 
     # 5. Poblado de Dim_Sentiment
     df_sentiment = pd.DataFrame([
