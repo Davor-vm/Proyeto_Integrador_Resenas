@@ -1,6 +1,6 @@
 """
 scripts/preprocessing/preprocessing.py
-Módulo de Limpieza de Texto y Análisis de Sentimiento (NLP).
+Módulo de Limpieza de Texto y Análisis de Sentimiento (NLP) Optimizado Localmente.
 """
 
 import re
@@ -10,7 +10,6 @@ import nltk
 from nltk.corpus import stopwords
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from textblob import TextBlob
-from deep_translator import GoogleTranslator
 
 # Configuración de rutas según la estructura del proyecto
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -22,23 +21,21 @@ PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 nltk.download('stopwords', quiet=True)
 STOP_WORDS_ES = set(stopwords.words('spanish'))
 
-# Inicializar VADER Sentiment Analyzer y Traductor
+# Inicializar VADER Sentiment Analyzer
 vader_analyzer = SentimentIntensityAnalyzer()
-translator = GoogleTranslator(source='auto', target='en')
 
+# Palabras clave en español para refuerzo léxico local
+PALABRAS_POSITIVAS = {
+    'excelente', 'bueno', 'buena', 'buen', 'perfecto', 'perfecta', 'genial', 
+    'encanta', 'me gusto', 'gusto', 'recomiendo', 'calidad', 'rapido', 'original',
+    'satisfecho', 'increible', 'maravilla', 'top', 'funciona', 'comodo', 'duradero'
+}
 
-def traducir_a_ingles(texto: str) -> str:
-    """
-    Traduce texto en español a inglés para optimizar el análisis de VADER/TextBlob.
-    Retorna el texto original si falla la conexión a internet.
-    """
-    if not texto or not isinstance(texto, str) or len(texto.strip()) < 3:
-        return ""
-    try:
-        # Se limita la longitud a 400 caracteres para agilizar el procesamiento
-        return translator.translate(texto[:400])
-    except Exception:
-        return texto
+PALABRAS_NEGATIVAS = {
+    'malo', 'mala', 'pesimo', 'pesima', 'defectuoso', 'horrible', 'no sirve', 
+    'roto', 'basura', 'decepcion', 'fatal', 'lento', 'caro', 'falso', 'debil',
+    'problema', 'fallo', 'chafa', 'devuelvo', 'devolucion', 'ruido'
+}
 
 
 def limpiar_texto(texto: str) -> str:
@@ -54,38 +51,44 @@ def limpiar_texto(texto: str) -> str:
     return " ".join(palabras)
 
 
-def calcular_sentimiento(texto_original: str, rating: float = None) -> tuple:
+def calcular_sentimiento_local(texto_original: str, rating: float = None) -> tuple:
     """
-    Calcula la polaridad combinando VADER y TextBlob, retornando la puntuación y categoría.
-    Aplica ajuste según el rating de la reseña si está disponible.
+    Calcula polaridad y categoría mediante evaluación léxica en español + rating,
+    evitando peticiones HTTP externas.
     """
     if not isinstance(texto_original, str) or not texto_original.strip():
         return 0.0, "Neutral"
     
-    # Traducir temporalmente para que VADER y TextBlob evalúen correctamente el español
-    texto_en = traducir_a_ingles(texto_original)
-    texto_evaluar = texto_en if texto_en else texto_original
+    texto_clean = texto_original.lower()
+    
+    # 1. Score por léxico en español
+    pos_count = sum(1 for p in PALABRAS_POSITIVAS if p in texto_clean)
+    neg_count = sum(1 for p in PALABRAS_NEGATIVAS if p in texto_clean)
+    
+    lexicon_score = 0.0
+    if (pos_count + neg_count) > 0:
+        lexicon_score = (pos_count - neg_count) / (pos_count + neg_count)
 
-    # 1. Análisis con TextBlob
-    blob = TextBlob(texto_evaluar)
-    polaridad_tb = blob.sentiment.polarity
-
-    # 2. Análisis con VADER
-    vader_scores = vader_analyzer.polarity_scores(texto_evaluar)
-    vader_compound = vader_scores['compound']
-
-    # Ponderación híbrida: 70% VADER + 30% TextBlob
-    polaridad_combinada = (vader_compound * 0.7) + (polaridad_tb * 0.3)
-    polaridad_final = round(polaridad_combinada, 3)
-
-    # Ajuste por inconsistencias (evita clasificar 5 estrellas como negativo)
+    # 2. TextBlob / VADER basico
+    blob_score = TextBlob(texto_original).sentiment.polarity
+    vader_score = vader_analyzer.polarity_scores(texto_original)['compound']
+    
+    # Combinación de scores locales
+    polaridad_calculada = (lexicon_score * 0.5) + (vader_score * 0.3) + (blob_score * 0.2)
+    
+    # 3. Calibración con el Rating de estrellas (Si existe)
     if rating is not None and pd.notna(rating):
-        if rating >= 4.0 and polaridad_final < 0:
-            polaridad_final = max(0.15, abs(polaridad_final))
-        elif rating <= 2.0 and polaridad_final > 0:
-            polaridad_final = min(-0.15, -abs(polaridad_final))
+        rating = float(rating)
+        if rating >= 4.0:
+            # Si el usuario puso 4 o 5 estrellas, el sentimiento debe ser al menos levemente positivo
+            polaridad_calculada = max(0.10, polaridad_calculada)
+        elif rating <= 2.0:
+            # Si el usuario puso 1 o 2 estrellas, debe ser negativo
+            polaridad_calculada = min(-0.10, -abs(polaridad_calculada))
 
-    # Asignación de categoría
+    polaridad_final = round(polaridad_calculada, 3)
+
+    # Clasificación final
     if polaridad_final >= 0.05:
         categoria = "Positivo"
     elif polaridad_final <= -0.05:
@@ -111,19 +114,19 @@ def ejecutar_preprocesamiento():
     df_reviews['comentario_limpio'] = df_reviews['comentario'].apply(limpiar_texto)
     df_reviews['longitud_texto'] = df_reviews['comentario'].fillna('').apply(len)
 
-    # Identificar columna de rating/calificación en el CSV de origen si existe
+    # Identificar columna de rating si existe
     col_rating = 'rating' if 'rating' in df_reviews.columns else ('calificacion' if 'calificacion' in df_reviews.columns else None)
 
-    # Calcular polaridad y etiqueta de sentimiento usando el enfoque híbrido VADER + TextBlob
+    # Calcular polaridad y etiqueta usando evaluación local rápida
     if col_rating:
-        resultados_sentimiento = df_reviews.apply(
-            lambda r: calcular_sentimiento(r['comentario'], r[col_rating]), axis=1
+        resultados = df_reviews.apply(
+            lambda r: calcular_sentimiento_local(r['comentario'], r[col_rating]), axis=1
         )
     else:
-        resultados_sentimiento = df_reviews['comentario'].apply(calcular_sentimiento)
+        resultados = df_reviews['comentario'].apply(calcular_sentimiento_local)
 
-    df_reviews['polaridad'] = [r[0] for r in resultados_sentimiento]
-    df_reviews['sentimiento'] = [r[1] for r in resultados_sentimiento]
+    df_reviews['polaridad'] = [r[0] for r in resultados]
+    df_reviews['sentimiento'] = [r[1] for r in resultados]
 
     # Guardar en la capa PROCESSED
     archivo_salida = PROCESSED_DIR / "reviews_clean.csv"

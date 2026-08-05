@@ -107,8 +107,11 @@ def ejecutar_etl_dw():
     con.execute("INSERT INTO Dim_Product SELECT * FROM temp_product;")
     print(f"Dim_Product poblada ({len(df_product)} productos).")
 
-    # 4. Poblado de Dim_Date (Ajustado para parsear texto relativo)
-    df['fecha_dt'] = df['fecha_review'].apply(parse_relative_date)
+    # 4. Poblado de Dim_Date (Corregido y normalizado sin horas)
+    # .dt.normalize() elimina la hora/minutos dejándolo en 00:00:00
+    df['fecha_dt'] = pd.to_datetime(df['fecha_review'].apply(parse_relative_date), errors='coerce').dt.normalize()
+    df['fecha_dt'] = df['fecha_dt'].fillna(pd.Timestamp.now().normalize())
+
     dates_unique = df['fecha_dt'].drop_duplicates().sort_values()
 
     df_date = pd.DataFrame({
@@ -118,10 +121,11 @@ def ejecutar_etl_dw():
         'quarter': dates_unique.dt.quarter,
         'month': dates_unique.dt.month,
         'day': dates_unique.dt.day
-    })
+    }).drop_duplicates(subset=['date_id'])  # Garantiza unicidad estricta para la Primary Key
+
     con.register('temp_date', df_date)
     con.execute("INSERT INTO Dim_Date SELECT * FROM temp_date;")
-    print(f"Dim_Date poblada ({len(df_date)} fechas unicas generadas).")
+    print(f"Dim_Date poblada ({len(df_date)} fechas únicas generadas).")
 
     # 5. Poblado de Dim_Sentiment
     df_sentiment = pd.DataFrame([
