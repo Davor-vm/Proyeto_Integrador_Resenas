@@ -1,0 +1,4 @@
+﻿sentiment_id,sentiment,polarity
+1,Positivo,0.5
+2,Neutral,0.0
+3,Negativo,-0.5

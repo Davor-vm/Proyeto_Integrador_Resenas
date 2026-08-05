@@ -1,6 +1,7 @@
 import duckdb
 
 con = duckdb.connect("data/warehouse/reviews.db")
+
 consulta = """
 SELECT
     fr.review_id,
